@@ -1,2 +1,2 @@
 # xoarer
-Want to xor some files? Then this tools is for you!
+Want to xor some files? Then this tool is for you!
