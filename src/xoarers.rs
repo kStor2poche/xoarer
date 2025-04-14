@@ -21,10 +21,15 @@ pub fn xor_with_sym(
     let symbol = Symbol::find(&elf_bytes, sym_name.clone())
         .ok_or(anyhow!("Symbol \"{}\" not found", sym_name))?;
 
-    //println!("Gread, found symbol {:?}", symbol);
+    //println!("Found symbol {:?}", symbol);
+
+    let file_offset = symbol
+        .get_file_offset(&elf_bytes)
+        .ok_or(anyhow!("Couldn't get file offset"))?;
+
     input_file
         .iter_mut()
-        .skip(symbol.value as usize)
+        .skip(file_offset as usize)
         .enumerate()
         .for_each(|(i, byte)| {
             if i < symbol.size as usize {
