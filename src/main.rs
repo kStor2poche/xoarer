@@ -1,61 +1,49 @@
 use {
-    anyhow::{Result, anyhow},
-    elf::{ElfBytes, endian::AnyEndian},
-    std::env::args,
-    xoarers::{xor_with_addr, xor_with_sym},
+    anyhow::Result, clap::Parser, cli::{Cli, CliCommand::{self, File}, FileXorMode::{Addr, Symbol, Whole}}, elf::{endian::AnyEndian, ElfBytes}, hex_utils::hex_decode, xoarers::{xor_whole, xor_with_addr, xor_with_sym}
 };
 
 mod hex_utils;
 mod sym_parser;
 mod xoarers;
+mod cli;
 
-fn usage() {
-    println!(
-        "Usage: xoarerv2 [file] [mode] [key]\nWhere mode can be one of:\n    -symbol [sym_name]\n    -addr [start_addr] [len]\n\naddress and key need to be in hex format, len may be in decimal or hexadecimal (needs 0x prefix then)."
-    )
-}
-
-// TODO: clap rework
 fn main() -> Result<()> {
-    let args = args();
-    if args.len() <= 1 {
-        usage();
-        return Err(anyhow!("No args? that's tubad!"));
-    }
-    let mut args = args.skip(1); // skip argv[0]
-    let orig_path;
-    let input_file = if let Some(path) = args.next() {
-        orig_path = path;
-        Ok::<_, anyhow::Error>(std::fs::read(&orig_path).expect("Sorry, can't read your file;...."))
-    } else {
-        usage();
-        return Err(anyhow!("No file??"));
-    }?;
+    let cli = Cli::parse();
+    let key_bytes = hex_decode(cli.key)?;
 
-    if let Some(arg) = args.next() {
-        match arg.as_str() {
-            "-symbol" | "-s" => {
-                let file_for_elf = input_file.clone();
-                let elf_bytes = ElfBytes::<AnyEndian>::minimal_parse(file_for_elf.as_slice())
-                    .expect("elf parse failed");
-                let sym_name = args.next().expect("symbol name arg not found");
-                let key = args.next().expect("need a key, but don't have one >:(");
-                xor_with_sym(orig_path, input_file, elf_bytes, sym_name, key)?
-            }
-            "-addr" | "-a" => {
-                let start_addr = args.next().expect("start addr arg not found");
-                let len = args.next().expect("len arg not found");
-                let key = args.next().expect("need a key, but don't have one >:(");
-                xor_with_addr(orig_path, input_file, start_addr, len, key)?
-            }
-            unknown => {
-                usage();
-                return Err(anyhow!("unknown option \"{}\"", unknown));
+    let out = match cli.command {
+        File { file, mode } => {
+            let input_file = std::fs::read(&file).expect("Sorry, can't read your file;....");
+            match mode {
+                Some(Addr { start, dest }) => {
+                    xor_with_addr(input_file, start, dest, key_bytes)?
+                },
+                Some(Symbol { name }) => {
+                    let file_for_elf = input_file.clone();
+                    let elf_bytes = ElfBytes::<AnyEndian>::minimal_parse(file_for_elf.as_slice())
+                        .expect("elf parse failed");
+                    xor_with_sym(input_file, elf_bytes, name, key_bytes)?
+                },
+                Some(Whole) => {
+                    xor_whole(input_file, key_bytes)
+                }
+                None => unreachable!(),
             }
         }
-    } else {
-        return Err(anyhow!("idk, don't ask me..."));
-    }
+        CliCommand::String { string } => {
+            let string_bytes = string.into_bytes();
+            xor_whole(string_bytes, key_bytes)
+        }
+    };
 
+    if let Some(path) = cli.out {
+        std::fs::write(path, out)?
+    } else {
+        if let Ok(str) = String::from_utf8(out.clone()) {
+            println!("{}", str)
+        } else {
+            println!("{:x?}", out)
+        }
+    }
     Ok(())
 }

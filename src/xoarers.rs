@@ -4,19 +4,15 @@ use {
 };
 
 use crate::{
-    hex_utils::{hex_bytes_to_usize, hex_decode},
-    sym_parser::Symbol,
+    cli::AddrDest, hex_utils::{hex_bytes_to_usize, hex_decode}, sym_parser::Symbol
 };
 
 pub fn xor_with_sym(
-    orig_path: String,
     mut input_file: Vec<u8>,
     elf_bytes: ElfBytes<AnyEndian>,
     sym_name: String,
-    key: String,
-) -> Result<()> {
-    let key_bytes = hex_decode(key)?;
-
+    key: Vec<u8>,
+) -> Result<Vec<u8>> {
     // How can we get mapping between binary and loaded layouts? Or is it even needed?
     let symbol = Symbol::find(&elf_bytes, sym_name.clone())
         .ok_or(anyhow!("Symbol \"{}\" not found", sym_name))?;
@@ -28,28 +24,40 @@ pub fn xor_with_sym(
         .enumerate()
         .for_each(|(i, byte)| {
             if i < symbol.size as usize {
-                *byte ^= key_bytes[i % key_bytes.len()];
+                *byte ^= key[i % key.len()];
             }
         });
 
-    Ok(std::fs::write(orig_path + "-xored", input_file)?)
+    Ok(input_file)
 }
 
 pub fn xor_with_addr(
-    orig_path: String,
     mut input_file: Vec<u8>,
     start_addr: String,
-    len: String,
-    key: String,
-) -> Result<()> {
-    let key_bytes = hex_decode(key)?;
+    dest: AddrDest,
+    key: Vec<u8>,
+) -> Result<Vec<u8>> {
     let start_addr = hex_bytes_to_usize(hex_decode(start_addr)?)?;
-    let len: usize = if let Ok(n) = len.parse::<usize>() {
-        Ok::<usize, anyhow::Error>(n)
-    } else {
-        let bytes = hex_decode(len)?;
-        Ok(hex_bytes_to_usize(bytes)?)
-    }?;
+    let len: usize = match dest {
+        AddrDest { end: None, length: Some(len) } => {
+            if let Ok(n) = len.parse::<usize>() {
+                Ok::<usize, anyhow::Error>(n)
+            } else {
+                let bytes = hex_decode(len)?;
+                Ok(hex_bytes_to_usize(bytes)?)
+            }?
+        },
+        AddrDest { end: Some(end), length: None } => {
+            let end_parsed = if let Ok(n) = end.parse::<usize>() {
+                Ok::<usize, anyhow::Error>(n)
+            } else {
+                let bytes = hex_decode(end)?;
+                Ok(hex_bytes_to_usize(bytes)?)
+            }?;
+            end_parsed - start_addr
+        }
+        _ => unreachable!(),
+    };
 
     input_file
         .iter_mut()
@@ -57,9 +65,13 @@ pub fn xor_with_addr(
         .enumerate()
         .for_each(|(i, byte)| {
             if i < len {
-                *byte ^= key_bytes[i % key_bytes.len()];
+                *byte ^= key[i % key.len()];
             }
         });
 
-    Ok(std::fs::write(orig_path + "-xored", input_file)?)
+    Ok(input_file)
+}
+
+pub fn xor_whole(to_xor: Vec<u8>, key: Vec<u8>) -> Vec<u8> {
+    todo!()
 }
