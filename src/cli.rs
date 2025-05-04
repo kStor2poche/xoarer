@@ -4,7 +4,7 @@ use clap::{Args, Parser, Subcommand};
 #[command(version, about = "A xoring tool with support for symbol xoring")]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: CliCommand,
+    pub input_type: InputType,
     #[arg(short, long)]
     pub key: String,
     #[arg(short, long)]
@@ -12,7 +12,7 @@ pub struct Cli {
 }
 
 #[derive(Subcommand, Debug)]
-pub enum CliCommand {
+pub enum InputType {
     File {
         #[arg()]
         file: String,

@@ -63,15 +63,19 @@ pub fn xor_with_addr(
         .iter_mut()
         .skip(start_addr)
         .enumerate()
+        .take(len)
         .for_each(|(i, byte)| {
-            if i < len {
-                *byte ^= key[i % key.len()];
-            }
+            *byte ^= key[i % key.len()];
         });
 
     Ok(input_file)
 }
 
-pub fn xor_whole(to_xor: Vec<u8>, key: Vec<u8>) -> Vec<u8> {
-    todo!()
+pub fn xor_whole(mut to_xor: Vec<u8>, key: Vec<u8>) -> Vec<u8> {
+    to_xor.iter_mut()
+        .enumerate()
+        .for_each(|(i, byte)| {
+            *byte ^= key[i % key.len()];
+        });
+    to_xor
 }

@@ -1,5 +1,5 @@
 use {
-    anyhow::Result, clap::Parser, cli::{Cli, CliCommand::{self, File}, FileXorMode::{Addr, Symbol, Whole}}, elf::{endian::AnyEndian, ElfBytes}, hex_utils::hex_decode, xoarers::{xor_whole, xor_with_addr, xor_with_sym}
+    anyhow::Result, clap::Parser, cli::{Cli, InputType, FileXorMode::{Addr, Symbol, Whole}}, elf::{endian::AnyEndian, ElfBytes}, hex_utils::hex_decode, xoarers::{xor_whole, xor_with_addr, xor_with_sym}
 };
 
 mod hex_utils;
@@ -11,8 +11,8 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let key_bytes = hex_decode(cli.key)?;
 
-    let out = match cli.command {
-        File { file, mode } => {
+    let out = match cli.input_type {
+        InputType::File { file, mode } => {
             let input_file = std::fs::read(&file).expect("Sorry, can't read your file;....");
             match mode {
                 Some(Addr { start, dest }) => {
@@ -30,7 +30,7 @@ fn main() -> Result<()> {
                 None => unreachable!(),
             }
         }
-        CliCommand::String { string } => {
+        InputType::String { string } => {
             let string_bytes = string.into_bytes();
             xor_whole(string_bytes, key_bytes)
         }
