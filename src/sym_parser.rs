@@ -50,4 +50,12 @@ impl Symbol {
 
         our_sym.get(0).cloned()
     }
+
+    pub fn get_file_offset(&self, file: &ElfBytes<AnyEndian>) -> Option<u64> {
+        let section = file
+            .section_headers()
+            .map(|sh| sh.get(self.shndx as usize).ok())
+            .flatten();
+        section.map(|s| self.value - (s.sh_addr - s.sh_offset))
+    }
 }
